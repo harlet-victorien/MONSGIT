@@ -27,8 +27,8 @@ while True:
     # Display the result
     cv2.imshow("YOLOv8 Instance Segmentation", frame)
 
-    # Exit when 'q' is pressed
-    if cv2.waitKey(1) == ord("q"):
+    # Exit when 'esc' is pressed
+    if cv2.waitKey(1) & 0xFF == 27:
         break
 
 # Clean up

@@ -34,8 +34,8 @@ while True:
     # Show frame
     cv2.imshow("YOLOv8 Webcam Detection", frame)
 
-    # Exit on pressing 'q'
-    if cv2.waitKey(1) == ord('q'):
+     # Exit when 'esc' is pressed
+    if cv2.waitKey(1) & 0xFF == 27:
         break
 
 # Release and destroy
