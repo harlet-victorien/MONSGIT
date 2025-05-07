@@ -23,6 +23,7 @@ screen_width, screen_height = pyautogui.size()
 clicked_left = False
 clicked_middle = False
 clicked_right = False  # For right click tracking
+clicked_scroll = False  # For scroll tracking
 control_enabled = True
 
 def toggle_control(event):
@@ -124,6 +125,8 @@ while cap.isOpened():
                 mp_hands.HandLandmark.INDEX_FINGER_TIP,
                 mp_hands.HandLandmark.MIDDLE_FINGER_TIP
             )
+
+            
             
             # Display status on image
             cv2.putText(
@@ -161,6 +164,8 @@ while cap.isOpened():
                     (0, 0, 255), 
                     2
                 )
+
+               
                 
                 # Check for middle finger down gesture (left click)
                 middle_finger_down = is_finger_down(
@@ -168,6 +173,47 @@ while cap.isOpened():
                     mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
                     mp_hands.HandLandmark.MIDDLE_FINGER_MCP
                 )
+
+                # Compute the distance between thumb and pinky
+                thumb_pinky_distance = ((hand1_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP].x - hand1_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP].x) ** 2 +
+                                        (hand1_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP].y - hand1_landmarks.landmark[mp_hands.HandLandmark.PINKY_TIP].y) ** 2) ** 0.5
+                
+                # Use wrist to index fingertip distance as a normalizing factor
+                wrist = hand1_landmarks.landmark[mp_hands.HandLandmark.WRIST]
+                index_tip = hand1_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+                hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
+                
+                # Normalize the distance
+                normalized_distance = thumb_pinky_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
+                
+                # Define thresholds for scrolling
+                scroll_up_threshold = 0.2  # Adjust based on testing
+                scroll_down_threshold = 0.2  # Adjust based on testing
+                
+                if normalized_distance < scroll_up_threshold:  # Thumb and pinky are close
+                    pyautogui.scroll(75)
+                    cv2.putText(
+                        image, 
+                        "Scroll up", 
+                        (10, 310), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        1, 
+                        (255, 0, 0), 
+                        2
+                    )
+                    print("Scroll up by thumb and pinky close")
+                elif normalized_distance > scroll_down_threshold and normalized_distance < 0.5:  # Thumb and pinky are far
+                    pyautogui.scroll(-75)
+                    cv2.putText(
+                        image, 
+                        "Scroll down", 
+                        (10, 310), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 
+                        1, 
+                        (255, 0, 0), 
+                        2
+                    )
+                    print("Scroll down by thumb and pinky far")
                 
                 if middle_finger_down:
                     if not clicked_left:
@@ -247,6 +293,10 @@ while cap.isOpened():
     if cv2.waitKey(1) & 0xFF == 27:
         break
 
+    #scroll up with A key
+    if keyboard.is_pressed('a'):
+        pyautogui.scroll(75)
+        
 # Clean up
 cap.release()
 cv2.destroyAllWindows()
