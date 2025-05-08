@@ -139,26 +139,39 @@ while cap.isOpened():
                 alpha = 0.2  # Transparency factor
                 image = cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0)
                 
-                # Check if any hand is inside this square
-                for idx, hand_center in enumerate(hand_centers):
-                    if is_point_in_rect(hand_center, x, y, square_size, square_size):
-                        color = (0, 255, 0)  # Green if hand is inside
-                        hand_in_square = True
-                        which_hand = hand_types[idx]
-                        
-                        # Make square green with semi-transparent fill when hand is inside
-                        overlay = image.copy()
-                        cv2.rectangle(overlay, (x, y), (x + square_size, y + square_size), (0, 255, 0), -1)
-                        image = cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0)
-                        break
-                
+                # Check for hands where both wrist and index finger are inside the square
+                if len(hand_centers) >= 2:  # Make sure we have at least some hand points
+                    for i in range(0, len(hand_centers), 2):  # Process pairs of points (wrist and index)
+                        if i+1 < len(hand_centers):  # Make sure we have both wrist and index
+                            wrist_idx = i
+                            index_idx = i+1
+                            
+                            # Check if both points are in the square
+                            wrist_in_square = is_point_in_rect(hand_centers[wrist_idx], x, y, square_size, square_size)
+                            index_in_square = is_point_in_rect(hand_centers[index_idx], x, y, square_size, square_size)
+                            
+                            # Only consider hand in square if both wrist and index finger are inside
+                            if wrist_in_square and index_in_square:
+                                color = (0, 255, 0)  # Green if hand is inside
+                                hand_in_square = True
+                                
+                                # Get the hand type (remove "_tip" suffix if present)
+                                base_hand_type = hand_types[wrist_idx]
+                                which_hand = base_hand_type
+                                
+                                # Make square green with semi-transparent fill when hand is inside
+                                overlay = image.copy()
+                                cv2.rectangle(overlay, (x, y), (x + square_size, y + square_size), (0, 255, 0), -1)
+                                image = cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0)
+                                break  # Exit loop if hand is found in square
+        
                 # Draw the square outline
                 cv2.rectangle(image, (x, y), (x + square_size, y + square_size), color, 2)
                 
                 # Display zone name and hand detection status
                 status_text = f"{name}: {which_hand}" if hand_in_square else f"{name}"
                 cv2.putText(image, status_text, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 
-                          0.7, color, 2)
+                        0.7, color, 2)
     
     # Calculate and display distances if both face and hands are detected
     if face_center and len(hand_centers) > 0 and head_size > 0:
