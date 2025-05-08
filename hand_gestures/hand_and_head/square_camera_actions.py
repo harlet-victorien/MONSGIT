@@ -26,7 +26,9 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000)
 
 # Variables to track control enable/disable
 control_enabled = True
-display_camera = False  # New variable to control camera display
+display_camera = True  # New variable to control camera display
+zoomed = False  # New variable for zoomed state
+last_pinky_thumb_state = False  # Track previous state to detect changes
 
 def toggle_control(event):
     global control_enabled
@@ -318,8 +320,48 @@ while cap.isOpened():
                     print("CONTROL ACTIVE - Both hands in position")
                     print(f"Fingers together: {'YES' if fingers_together else 'NO'}")
                     
-                    # Only detect zones if fingers are together
+                    # Only detect zones and check for zoom toggle if fingers are together
                     if fingers_together:
+                        # Check if pinky and thumb are together on the LEFT hand (action hand)
+                        pinky_thumb_together = are_fingers_together(
+                            left_hand,
+                            mp_hands.HandLandmark.PINKY_TIP,
+                            mp_hands.HandLandmark.THUMB_TIP
+                        )
+                        
+                        # Toggle zoomed state only on change from not-together to together
+                        if pinky_thumb_together and not last_pinky_thumb_state:
+                            zoomed = not zoomed
+                            print(f"ZOOM STATE TOGGLED: {'ZOOMED IN' if zoomed else 'ZOOMED OUT'}")
+                        
+                        # Update the previous state
+                        last_pinky_thumb_state = pinky_thumb_together
+                        
+                        # Display zoom status if camera display is enabled
+                        if display_camera:
+                            zoom_status = "ZOOMED IN" if zoomed else "ZOOMED OUT"
+                            cv2.putText(
+                                image,
+                                f"Zoom: {zoom_status}",
+                                (10, 70),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                1,
+                                (0, 255, 255),
+                                2
+                            )
+                            
+                            # Visualize pinky-thumb state
+                            pinky_status = "Pinky-Thumb Together" if pinky_thumb_together else "Pinky-Thumb Apart"
+                            cv2.putText(
+                                image,
+                                pinky_status,
+                                (10, 110),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.7,
+                                (0, 255, 255),
+                                2
+                            )
+                        
                         # Find the Left Zone square (which is physically on the right) for zone detection
                         left_zone_square = None
                         for sq in squares:
@@ -354,6 +396,18 @@ while cap.isOpened():
                             if current_zone is None and is_point_in_rect(index_tip_pos, sq_x, sq_y, square_size, square_size):
                                 # This handles edge cases where the finger is in the square but not clearly in a zone
                                 print("Index finger tip is in square but zone detection is unclear")
+
+                            # Draw the zone name on the image
+                            if display_camera and current_zone:
+                                cv2.putText(
+                                    image,
+                                    current_zone,
+                                    (10, 160),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.7,
+                                    (255, 0, 0),
+                                    2
+                                )
     
     # Display the camera feed only if display_camera is True
     if display_camera:
@@ -368,25 +422,7 @@ while cap.isOpened():
             (0, 255, 0), 
             2
         )
-        
-        # Calculate and display distances if both face and hands are detected
-        if face_center and len(hand_centers) > 0 and head_size > 0:
-            for idx, hand_center in enumerate(hand_centers):
-                if "tip" not in hand_types[idx]:  # Only draw lines for wrists, not fingertips
-                    # Calculate distance
-                    distance = calculate_distance(face_center, hand_center)
-                    
-                    # Normalize by head size
-                    normalized_distance = distance / head_size
-                    
-                    # Draw line between hand and face
-                    cv2.line(image, face_center, hand_center, (0, 0, 255), 2)
-                    
-                    # Display the normalized distance
-                    text_position = (hand_center[0], hand_center[1] - 10)
-                    cv2.putText(image, f"{hand_types[idx]}: {normalized_distance:.2f}", 
-                              text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1)
-        
+                
         # Display the camera feed
         cv2.imshow('Square Zone Detection', image)
     
