@@ -185,28 +185,30 @@ class HandFaceTracker:
                     right_eye_pos = (int(right_eye.x * iw), int(right_eye.y * ih))
                     head_size = self.calculate_distance(left_eye_pos, right_eye_pos)
 
-                    square_size = int(head_size * 4)
+                    square_size_left = int(head_size * 6)
+                    square_size_right = int(head_size * 4)
                     distance_factor = 1.5
 
                     squares = [
                         {
-                            'x': int(face_center[0] - distance_factor * head_size - square_size),
-                            'y': int(face_center[1] - square_size/2),
+                            'x': int(face_center[0] - distance_factor * head_size - square_size_right),
+                            'y': int(face_center[1] - square_size_right/2),
                             'name': 'Right Zone',
                             'hand_detected': None
                         },
                         {
                             'x': int(face_center[0] + distance_factor * head_size),
-                            'y': int(face_center[1] - square_size/2),
+                            'y': int(face_center[1] - square_size_left/2),
                             'name': 'Left Zone',
                             'hand_detected': None
                         }
                     ]
 
                     if self.display_camera:
-                        for square in squares:
-                            x, y = square['x'], square['y']
-                            image = self.draw_square_with_zones(image, x, y, square_size, square['name'])
+                        x, y = squares[0]['x'], squares[0]['y']
+                        image = self.draw_square_with_zones(image, x, y, square_size_right, squares[0]['name'])
+                        x, y = squares[1]['x'], squares[1]['y']
+                        image = self.draw_square_with_zones(image, x, y, square_size_left, squares[1]['name'])
 
                     if len(hand_centers) >= 2:
                         for i in range(0, len(hand_centers), 2):
@@ -214,8 +216,9 @@ class HandFaceTracker:
                                 wrist_idx = i
                                 index_idx = i+1
 
-                                for square in squares:
+                                for idx, square in enumerate(squares):
                                     x, y = square['x'], square['y']
+                                    square_size = square_size_right if idx == 0 else square_size_left
                                     wrist_in_square = self.is_point_in_rect(hand_centers[wrist_idx], x, y, square_size, square_size)
                                     index_in_square = self.is_point_in_rect(hand_centers[index_idx], x, y, square_size, square_size)
 
@@ -229,8 +232,9 @@ class HandFaceTracker:
                                         square['hand_detected'] = base_hand_type
 
                     if self.display_camera:
-                        for square in squares:
+                        for idx, square in enumerate(squares):
                             x, y = square['x'], square['y']
+                            square_size = square_size_right if idx == 0 else square_size_left
                             color = (0, 255, 0) if square['hand_detected'] else (0, 0, 255)
                             cv2.rectangle(image, (x, y), (x + square_size, y + square_size), color, 2)
                             status_text = f"{square['name']}: {square['hand_detected']}" if square['hand_detected'] else f"{square['name']}"
@@ -291,7 +295,7 @@ class HandFaceTracker:
 
                                     current_zone = None
                                     for i in range(4):
-                                        if self.is_point_in_diagonal_zone(index_tip_pos, sq_x, sq_y, square_size, i):
+                                        if self.is_point_in_diagonal_zone(index_tip_pos, sq_x, sq_y, square_size_left, i):
                                             current_zone = f"Zone {i+1}"
                                             break
 
