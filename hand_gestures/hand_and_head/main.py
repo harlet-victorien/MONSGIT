@@ -1,6 +1,15 @@
 from gestureController import HandFaceTracker
 import cv2
+import sys
+import os
 
+
+Servo = False
+if Servo:
+    from servo import ServoKitTrackingSpeedPose
+    calibration = ServoKitTrackingSpeedPose.PoseTracker()
+
+    
 handFaceTracker = HandFaceTracker()
 
 while handFaceTracker.cap.isOpened():
@@ -31,6 +40,19 @@ while handFaceTracker.cap.isOpened():
     print("Current zone:", handFaceTracker.current_zone)
     print("Current zoom:", handFaceTracker.zoomed)
     '''----------------------------'''
+    if Servo:
+        angle0 = calibration.servo_kit.getAngle(0)
+        angle1 = calibration.servo_kit.getAngle(1)
+        if handFaceTracker.current_zone == 1:
+            calibration.setAngleDeg(0, angle0 + 1)
+        elif handFaceTracker.current_zone == 2:
+            calibration.setAngleDeg(1, angle1 + 1)
+        elif handFaceTracker.current_zone == 3:
+            calibration.setAngleDeg(0, angle0 - 1)
+        elif handFaceTracker.current_zone == 4:
+            calibration.setAngleDeg(1, angle1 - 1)
+
+
 
 handFaceTracker.cap.release()
 cv2.destroyAllWindows()
