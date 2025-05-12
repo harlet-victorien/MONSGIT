@@ -1,0 +1,2 @@
+- main class with all setup and processing : **gestureController.py**
+- file to use the class externally : **main.py**
