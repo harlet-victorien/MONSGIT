@@ -1,7 +1,6 @@
 from gestureController import HandFaceTracker
 import cv2
-import sys
-import os
+
 
 
 Servo = False

@@ -251,24 +251,38 @@ class HandFaceTracker:
                     if fingers_together:
                         status_text_main = "Control: ENABLED"
 
-                        pinky_thumb_together = self.are_fingers_together(
-                            left_hand,
-                            self.mp_hands.HandLandmark.PINKY_TIP,
-                            self.mp_hands.HandLandmark.THUMB_TIP
+                        # Calculate the distance between pinky and thumb on the left hand
+                        pinky_tip = left_hand.landmark[self.mp_hands.HandLandmark.PINKY_TIP]
+                        thumb_tip = left_hand.landmark[self.mp_hands.HandLandmark.THUMB_TIP]
+
+                        # Calculate the distance between pinky and thumb tips
+                        thumb_pinky_distance = self.calculate_distance(
+                            (thumb_tip.x, thumb_tip.y),
+                            (pinky_tip.x, pinky_tip.y)
                         )
+                        
+                        # Use wrist to index fingertip distance as a normalizing factor
+                        wrist = left_hand.landmark[self.mp_hands.HandLandmark.WRIST]
+                        index_tip = left_hand.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
+                        hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
+                        
+                        # Normalize the distance
+                        normalized_distance = thumb_pinky_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
+                        
+                        # Define thresholds for zooming
+                        zoom_in_threshold = 0.2  # Adjust based on testing
+                        zoom_out_threshold = 0.2  # Adjust based on testing
+                        
+                        if normalized_distance < zoom_in_threshold:  # Thumb and pinky are close
+                            cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                            print("Zoom in triggered by thumb and pinky close")
 
-                        if pinky_thumb_together and not self.last_pinky_thumb_state:
-                            self.zoomed = not self.zoomed
-                            print(f"ZOOM STATE TOGGLED: {'ZOOMED IN' if self.zoomed else 'ZOOMED OUT'}")
+                        elif normalized_distance > zoom_out_threshold and normalized_distance < 0.5:  # Thumb and pinky are far
+                            cv2.putText(image, "ZOOM OUT", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+                            print("Zoom out triggered by thumb and pinky far")
 
-                        self.last_pinky_thumb_state = pinky_thumb_together
 
-                        if self.display_camera:
-                            zoom_status = "ZOOMED IN" if self.zoomed else "ZOOMED OUT"
-                            cv2.putText(image, f"Zoom: {zoom_status}", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                            pinky_status = "Pinky-Thumb Together" if pinky_thumb_together else "Pinky-Thumb Apart"
-                            cv2.putText(image, pinky_status, (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-
+                       
                         left_zone_square = next((sq for sq in squares if sq['name'] == 'Left Zone'), None)
                         if left_zone_square and 'Left' in hand_landmarks_dict:
                             index_tip = hand_landmarks_dict['Left'].landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
@@ -288,7 +302,8 @@ class HandFaceTracker:
                                     break
 
                             if self.display_camera and self.current_zone:
-                                cv2.putText(image, f"Zone: {self.current_zone}", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                                cv2.putText(image, f"Zone: {self.current_zone}", (10, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+
 
         if self.display_camera:
             cv2.putText(image, status_text_main, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
