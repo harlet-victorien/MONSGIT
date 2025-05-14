@@ -72,6 +72,9 @@ class HandFaceTracker:
         # Flipped main camera variable
         self.flipped = False
 
+        # Camera to zoom
+        self.cameraNum_to_zoom = 1
+
     def capture_second_camera(self):
         """Capture image from second camera."""
         if not self.second_camera_available:
@@ -457,6 +460,12 @@ class HandFaceTracker:
         x, y = squares[1]['x'], squares[1]['y']
         image = self.draw_square_with_zones(image, x, y, square_size_left, squares[1]['name'])
         return image
+    
+    def cropping_image(self, image):
+        cropped_image = image[self.y1:self.y2, self.x1:self.x2]
+        image = cv2.resize(cropped_image, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+        return image
+
         
     def run(self):
         """Run the main loop to process video frames and perform gesture-based control."""
@@ -465,8 +474,14 @@ class HandFaceTracker:
         while self.cap.isOpened():
 
             success, image = self.cap.read()
-            cropped_image = image[self.y1:self.y2, self.x1:self.x2]
-            image = cv2.resize(cropped_image, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+            if self.second_camera_available:
+                second_image = self.capture_second_camera()
+            
+            if self.cameraNum_to_zoom == 0:
+                image = self.cropping_image(image)
+            elif self.second_camera_available:
+                second_image = self.cropping_image(second_image)
+
             if not success:
                 print("Failed to capture image from webcam.")
                 return None
@@ -478,8 +493,7 @@ class HandFaceTracker:
             
             image, hand_centers, hand_types, hand_landmarks_dict, face_center, head_size = self.image_setup(image)
             
-            if self.second_camera_available:
-                second_image = self.capture_second_camera()
+            
 
             if image is None:
                 print("No image captured from main camera. Exiting...")
