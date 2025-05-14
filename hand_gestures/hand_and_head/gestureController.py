@@ -56,6 +56,7 @@ class HandFaceTracker:
         keyboard.on_press_key('d', self.toggle_display)
 
         # Thresholds
+        self.zoom_in_out = 1
         self.threshold = 0.13
         self.zoom_in_threshold = 0.2
         self.zoom_out_threshold = 0.2
@@ -177,7 +178,41 @@ class HandFaceTracker:
                 cv2.putText(image, zone_name, zone_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
         return image
+    
+    def zoom_in(self, image):
+        """Crop the camera to simulate a zoom in that is linear while keeping the window size constant."""
+        ih, iw, _ = image.shape
+        center = (iw // 2, ih // 2)
+        x1 = center[0] - iw//2 + self.zoom_in_out
+        y1 = int(x1//1.5)
+        x2 = center[0] + iw//2 - self.zoom_in_out
+        y2 = int(x2//1.5)
+        print(x1, y1, x2, y2)
 
+        # Crop and resize back to original dimensions to maintain window size
+        cropped_image = image[y1:y2, x1:x2]
+        zoomed_image = cv2.resize(cropped_image, (iw, ih), interpolation=cv2.INTER_LINEAR)
+        self.zoom_in_out += 1
+        return zoomed_image
+    
+    def zoom_out(self, image):
+        """Crop the camera to simulate a zoom out that is linear while keeping the window size constant."""
+        ih, iw, _ = image.shape
+        center = (iw // 2, ih // 2)
+        x1 = center[0] - iw//2 + self.zoom_in_out
+        y1 = int(x1//1.5)
+        x2 = center[0] + iw//2 - self.zoom_in_out
+        y2 = int(x2//1.5)
+
+        # Crop and resize back to original dimensions to maintain window size
+        cropped_image = image[y1:y2, x1:x2]
+        zoomed_image = cv2.resize(cropped_image, (iw, ih), interpolation=cv2.INTER_LINEAR)
+        self.zoom_in_out -= 1
+        return zoomed_image
+        
+    
+  
+        
     def process_hand_landmarks(self, image, hand_results):
         """Process hand landmarks and return hand centers and types."""
         hand_centers = []
@@ -312,10 +347,12 @@ class HandFaceTracker:
                         )
                                                 
                         if normalized_distance < self.zoom_in_threshold:  # Thumb and pinky are close
+                            image = self.zoom_in(image)
                             cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom in triggered by thumb and pinky close")
 
                         elif normalized_distance > self.zoom_out_threshold and normalized_distance < 0.5:  # Thumb and pinky are far
+                         
                             cv2.putText(image, "ZOOM OUT", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom out triggered by thumb and pinky far")
 
@@ -355,7 +392,7 @@ class HandFaceTracker:
             print("Failed to capture image from webcam.")
             return None
 
-        image = cv2.flip(image, 0)
+        image = cv2.flip(image, 1)
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         hand_results = self.hands.process(rgb_image)
