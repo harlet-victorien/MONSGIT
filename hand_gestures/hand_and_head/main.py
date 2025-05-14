@@ -3,10 +3,10 @@ import cv2
 
 
 
-Servo = False
+Servo = True
 if Servo:
-    from servo import ServoKitTrackingSpeedPose
-    calibration = ServoKitTrackingSpeedPose.PoseTracker()
+    from servo.ServoKitTrackingSpeedPose import PoseTracker
+    calibration = PoseTracker()
 
     
 handFaceTracker = HandFaceTracker()
@@ -18,6 +18,7 @@ while handFaceTracker.cap.isOpened():
         print("No image captured. Exiting...")
         break
 
+    handFaceTracker.current_zone = None
     if face_center:
         squares, square_size_left, square_size_right = handFaceTracker.zones_setup(face_center, head_size)
 
@@ -40,16 +41,16 @@ while handFaceTracker.cap.isOpened():
     print("Current zoom:", handFaceTracker.zoomed)
     '''----------------------------'''
     if Servo:
-        angle0 = calibration.servo_kit.getAngle(0)
-        angle1 = calibration.servo_kit.getAngle(1)
+        angle0 = calibration.servo_kit.getAngleDeg(0)
+        angle1 = calibration.servo_kit.getAngleDeg(1)
         if handFaceTracker.current_zone == 1:
-            calibration.setAngleDeg(0, angle0 + 1)
+            calibration.servo_kit.setAngleDeg(1, angle1 + 1)
         elif handFaceTracker.current_zone == 2:
-            calibration.setAngleDeg(1, angle1 + 1)
+            calibration.servo_kit.setAngleDeg(0, angle0 + 1)
         elif handFaceTracker.current_zone == 3:
-            calibration.setAngleDeg(0, angle0 - 1)
+            calibration.servo_kit.setAngleDeg(1, angle1 - 1)
         elif handFaceTracker.current_zone == 4:
-            calibration.setAngleDeg(1, angle1 - 1)
+            calibration.servo_kit.setAngleDeg(0, angle0 - 1)
 
 
 
