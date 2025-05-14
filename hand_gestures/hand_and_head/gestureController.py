@@ -12,6 +12,9 @@ class HandFaceTracker:
         """
         Initialize MediaPipe hands and face mesh, webcams, and control variables.
         """
+
+        # resolution for camera
+        self.x1, self.y1, self.x2, self.y2 = 0, 0, 1280, 720
         # Initialize MediaPipe hands and face mesh
         self.mp_hands = mp.solutions.hands
         self.mp_face_mesh = mp.solutions.face_mesh
@@ -63,6 +66,7 @@ class HandFaceTracker:
         self.threshold_rock_and_roll = 0.14
         self.zoom_threshold = 0.2
         self.zoom_border_threshold = 0.4
+        self.zoom_in_out = 0  
         self.display_threshold = True
 
         # Flipped main camera variable
@@ -220,32 +224,24 @@ class HandFaceTracker:
         """Crop the camera to simulate a zoom in that is linear while keeping the window size constant."""
         ih, iw, _ = image.shape
         center = (iw // 2, ih // 2)
-        x1 = center[0] - iw//2 + self.zoom_in_out
-        y1 = int(x1//1.5)
-        x2 = center[0] + iw//2 - self.zoom_in_out
-        y2 = int(x2//1.5)
-        print(x1, y1, x2, y2)
-
-        # Crop and resize back to original dimensions to maintain window size
-        cropped_image = image[y1:y2, x1:x2]
-        zoomed_image = cv2.resize(cropped_image, (iw, ih), interpolation=cv2.INTER_LINEAR)
-        self.zoom_in_out += 1
-        return zoomed_image
+        self.x1 = max(0, center[0] - iw//2 + self.zoom_in_out)
+        self.y1 = max(0, int(self.x1//1.5))
+        self.x2 = min(iw, center[0] + iw//2 - self.zoom_in_out)
+        self.y2 = min(ih, int(self.x2//1.5))
+        self.zoom_in_out += 3
+        return
     
     def zoom_out(self, image):
         """Crop the camera to simulate a zoom out that is linear while keeping the window size constant."""
         ih, iw, _ = image.shape
         center = (iw // 2, ih // 2)
-        x1 = center[0] - iw//2 + self.zoom_in_out
-        y1 = int(x1//1.5)
-        x2 = center[0] + iw//2 - self.zoom_in_out
-        y2 = int(x2//1.5)
-
-        # Crop and resize back to original dimensions to maintain window size
-        cropped_image = image[y1:y2, x1:x2]
-        zoomed_image = cv2.resize(cropped_image, (iw, ih), interpolation=cv2.INTER_LINEAR)
-        self.zoom_in_out -= 1
-        return zoomed_image
+        self.x1 = max(0, center[0] - iw//2 + self.zoom_in_out)
+        self.y1 = max(0, int(self.x1//1.5))
+        self.x2 = min(iw, center[0] + iw//2 - self.zoom_in_out)
+        self.y2 = min(ih, int(self.x2//1.5))
+        self.zoom_in_out -= 3
+        return
+        
         
     
   
@@ -368,12 +364,6 @@ class HandFaceTracker:
                     left_hand = hand_landmarks_dict['Left']
                     right_hand = hand_landmarks_dict['Right']
 
-                    fingers_together = self.are_fingers_together(
-                        right_hand,
-                        self.mp_hands.HandLandmark.INDEX_FINGER_TIP,
-                        self.mp_hands.HandLandmark.MIDDLE_FINGER_TIP
-                    )
-
                     fingers_are_rock_and_roll = self.are_fingers_rock_and_roll(right_hand, image)
 
                     if fingers_are_rock_and_roll:
@@ -386,10 +376,13 @@ class HandFaceTracker:
                         )
                                                 
                         if normalized_distance < self.zoom_threshold:  # Thumb and pinky are close
+                            
+                            self.zoom_in(image)
                             cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom in triggered by thumb and pinky close")
 
                         elif normalized_distance > self.zoom_threshold and normalized_distance < self.zoom_border_threshold:  # Thumb and pinky are far
+                            self.zoom_out(image)
                             cv2.putText(image, "ZOOM OUT", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom out triggered by thumb and pinky far")
 
@@ -422,17 +415,8 @@ class HandFaceTracker:
 
         return image
 
-    def image_setup(self):
+    def image_setup(self, image):
         """Initialize the image, gets hands and face landmarks."""
-        success, image = self.cap.read()
-        if not success:
-            print("Failed to capture image from webcam.")
-            return None
-
-        if self.flipped:
-            image = cv2.flip(image, 0)
-        else:
-            image = cv2.flip(image, 1)
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         hand_results = self.hands.process(rgb_image)
@@ -479,8 +463,20 @@ class HandFaceTracker:
         print("Script is running. Press 'n' to toggle control, 'd' to toggle camera display, ESC to exit.")
 
         while self.cap.isOpened():
+
+            success, image = self.cap.read()
+            cropped_image = image[self.y1:self.y2, self.x1:self.x2]
+            image = cv2.resize(cropped_image, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+            if not success:
+                print("Failed to capture image from webcam.")
+                return None
+
+            if self.flipped:
+                image = cv2.flip(image, 0)
+            else:
+                image = cv2.flip(image, 1)
             
-            image, hand_centers, hand_types, hand_landmarks_dict, face_center, head_size = self.image_setup()
+            image, hand_centers, hand_types, hand_landmarks_dict, face_center, head_size = self.image_setup(image)
             
             if self.second_camera_available:
                 second_image = self.capture_second_camera()
