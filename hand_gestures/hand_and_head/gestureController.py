@@ -37,10 +37,13 @@ class HandFaceTracker:
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 2000)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000)
         
-        # Initialize second webcam
+        # Initialize second webcam with error handling
         self.cap2 = cv2.VideoCapture(1)  # Using camera index 1 for the second camera
         self.cap2.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap2.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        self.second_camera_available = self.cap2.isOpened()
+        if not self.second_camera_available:
+            print("Second camera not available. Continuing with primary camera only.")
 
         # Variables to track control enable/disable
         self.control_enabled = True
@@ -56,16 +59,24 @@ class HandFaceTracker:
         keyboard.on_press_key('d', self.toggle_display)
 
         # Thresholds
-        self.threshold = 0.13
-        self.zoom_in_threshold = 0.2
-        self.zoom_out_threshold = 0.2
+        self.threshold_together = 0.13
+        self.threshold_rock_and_roll = 0.14
+        self.zoom_threshold = 0.2
+        self.zoom_border_threshold = 0.4
+        self.display_threshold = True
+
+        # Flipped main camera variable
+        self.flipped = False
 
     def capture_second_camera(self):
         """Capture image from second camera."""
+        if not self.second_camera_available:
+            # Return a blank image of the right size instead of None
+            return np.zeros((480, 640, 3), dtype=np.uint8)
+        
         success, second_image = self.cap2.read()
         if not success:
-            print("Failed to capture image from second webcam.")
-            return None
+            return np.zeros((480, 640, 3), dtype=np.uint8)
         return second_image
 
     def toggle_control(self, event):
@@ -115,21 +126,48 @@ class HandFaceTracker:
         hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
 
         normalized_distance = tips_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
-        return normalized_distance < self.threshold
+        return normalized_distance < self.threshold_together
         
-    def are_fingers_rock_and_roll(self, landmarks):
+    def are_fingers_rock_and_roll(self, landmarks, image=None):
         """Check if fingers are in a rock and roll position."""
-        # Check if the thumb and pinky are close together
-        thumb_tip = landmarks.landmark[self.mp_hands.HandLandmark.THUMB_TIP]
-        pinky_tip = landmarks.landmark[self.mp_hands.HandLandmark.PINKY_TIP]
-        tips_distance = ((thumb_tip.x - pinky_tip.x) ** 2 + (thumb_tip.y - pinky_tip.y) ** 2) ** 0.5
-
-        wrist = landmarks.landmark[self.mp_hands.HandLandmark.WRIST]
+        # First we check if the index and pinky tips are far enough from the wrist
         index_tip = landmarks.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
-        hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
+        pinky_tip = landmarks.landmark[self.mp_hands.HandLandmark.PINKY_TIP]
+        wrist = landmarks.landmark[self.mp_hands.HandLandmark.WRIST]
+        index_distance = self.calculate_distance((index_tip.x, index_tip.y), (wrist.x, wrist.y))
+        pinky_distance = self.calculate_distance((pinky_tip.x, pinky_tip.y), (wrist.x, wrist.y))
+        
+        # Then we check if the middle and ring fingers tips are close enough to the wrist
+        middle_tip = landmarks.landmark[self.mp_hands.HandLandmark.MIDDLE_FINGER_TIP]
+        ring_tip = landmarks.landmark[self.mp_hands.HandLandmark.RING_FINGER_TIP]
+        middle_distance = self.calculate_distance((middle_tip.x, middle_tip.y), (wrist.x, wrist.y))
+        ring_distance = self.calculate_distance((ring_tip.x, ring_tip.y), (wrist.x, wrist.y))
+        
+        # If image is provided and display_camera is enabled, visualize the threshold
+        if image is not None and self.display_camera and self.display_threshold:
+            ih, iw, _ = image.shape
+            wrist_pos = (int(wrist.x * iw), int(wrist.y * ih))
+            
+            # Convert normalized threshold to pixel distance
+            # We'll use the distance from wrist to index tip as reference
+            index_tip_pos = (int(index_tip.x * iw), int(index_tip.y * ih))
+            actual_distance = self.calculate_distance(wrist_pos, index_tip_pos)
+            normalized_distance_ratio = index_distance
+            
+            # Calculate pixel threshold
+            threshold_pixel_distance = int(self.threshold_rock_and_roll * actual_distance / normalized_distance_ratio)
+            
+            # Draw reference line showing the threshold distance
+            threshold_end_point = (wrist_pos[0], wrist_pos[1] - threshold_pixel_distance)
+            cv2.line(image, wrist_pos, threshold_end_point, (255, 255, 0), 2)  # Yellow line
+            
+        if index_distance < self.threshold_rock_and_roll or pinky_distance < self.threshold_rock_and_roll:
+            return False
+        
+        if middle_distance > self.threshold_rock_and_roll or ring_distance > self.threshold_rock_and_roll:
+            return False
 
-        normalized_distance = tips_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
-        return normalized_distance < self.threshold
+        return True
         
 
     def distance_between_fingers(self, landmarks, finger1_tip_id, finger2_tip_id):
@@ -302,7 +340,9 @@ class HandFaceTracker:
                         self.mp_hands.HandLandmark.MIDDLE_FINGER_TIP
                     )
 
-                    if fingers_together:
+                    fingers_are_rock_and_roll = self.are_fingers_rock_and_roll(right_hand, image)
+
+                    if fingers_are_rock_and_roll:
                         status_text_main = "Control: ENABLED"
 
                         normalized_distance = self.distance_between_fingers(
@@ -311,11 +351,11 @@ class HandFaceTracker:
                             self.mp_hands.HandLandmark.THUMB_TIP
                         )
                                                 
-                        if normalized_distance < self.zoom_in_threshold:  # Thumb and pinky are close
+                        if normalized_distance < self.zoom_threshold:  # Thumb and pinky are close
                             cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom in triggered by thumb and pinky close")
 
-                        elif normalized_distance > self.zoom_out_threshold and normalized_distance < 0.5:  # Thumb and pinky are far
+                        elif normalized_distance > self.zoom_threshold and normalized_distance < self.zoom_border_threshold:  # Thumb and pinky are far
                             cv2.putText(image, "ZOOM OUT", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom out triggered by thumb and pinky far")
 
@@ -355,7 +395,10 @@ class HandFaceTracker:
             print("Failed to capture image from webcam.")
             return None
 
-        image = cv2.flip(image, 0)
+        if self.flipped:
+            image = cv2.flip(image, 0)
+        else:
+            image = cv2.flip(image, 1)
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         hand_results = self.hands.process(rgb_image)
@@ -401,13 +444,15 @@ class HandFaceTracker:
         """Run the main loop to process video frames and perform gesture-based control."""
         print("Script is running. Press 'n' to toggle control, 'd' to toggle camera display, ESC to exit.")
 
-        while self.cap.isOpened() and self.cap2.isOpened():
+        while self.cap.isOpened():
             
             image, hand_centers, hand_types, hand_landmarks_dict, face_center, head_size = self.image_setup()
-            second_image = self.capture_second_camera()
+            
+            if self.second_camera_available:
+                second_image = self.capture_second_camera()
 
-            if image is None or second_image is None:
-                print("No image captured. Exiting...")
+            if image is None:
+                print("No image captured from main camera. Exiting...")
                 break
 
             if face_center:
@@ -422,15 +467,17 @@ class HandFaceTracker:
 
             if self.display_camera:
                 cv2.imshow('Square Zone Detection', image)
-                # Display the second camera feed in a separate window
-                cv2.imshow('Second Camera', second_image)
+                if self.second_camera_available:
+                    # Display the second camera feed in a separate window
+                    cv2.imshow('Second Camera', second_image)
 
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC to exit
                 break
 
         self.cap.release()
-        self.cap2.release()
+        if self.second_camera_available:
+            self.cap2.release()
         cv2.destroyAllWindows()
         print("Script terminated.")
 
