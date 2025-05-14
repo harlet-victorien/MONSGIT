@@ -82,12 +82,12 @@ class HandFaceTracker:
     def toggle_control(self, event):
         """Toggle the control state between enabled and disabled."""
         self.control_enabled = not self.control_enabled
-        print(f"Control {'enabled' if self.control_enabled else 'disabled'}")
+        #print(f"Control {'enabled' if self.control_enabled else 'disabled'}")
 
     def toggle_display(self, event):
         """Toggle the camera display state between enabled and disabled."""
         self.display_camera = not self.display_camera
-        print(f"Camera display {'enabled' if self.display_camera else 'disabled'}")
+        #print(f"Camera display {'enabled' if self.display_camera else 'disabled'}")
 
     def calculate_distance(self, point1, point2):
         """Calculate the Euclidean distance between two points."""
@@ -353,11 +353,11 @@ class HandFaceTracker:
                                                 
                         if normalized_distance < self.zoom_threshold:  # Thumb and pinky are close
                             cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                            print("Zoom in triggered by thumb and pinky close")
+                            #print("Zoom in triggered by thumb and pinky close")
 
                         elif normalized_distance > self.zoom_threshold and normalized_distance < self.zoom_border_threshold:  # Thumb and pinky are far
                             cv2.putText(image, "ZOOM OUT", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-                            print("Zoom out triggered by thumb and pinky far")
+                            #print("Zoom out triggered by thumb and pinky far")
 
 
                        
