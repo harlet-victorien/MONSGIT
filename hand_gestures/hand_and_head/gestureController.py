@@ -55,6 +55,11 @@ class HandFaceTracker:
         # Register the key press event to toggle display
         keyboard.on_press_key('d', self.toggle_display)
 
+        # Thresholds
+        self.threshold = 0.13
+        self.zoom_in_threshold = 0.2
+        self.zoom_out_threshold = 0.2
+
     def capture_second_camera(self):
         """Capture image from second camera."""
         success, second_image = self.cap2.read()
@@ -110,11 +115,21 @@ class HandFaceTracker:
         hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
 
         normalized_distance = tips_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
-        threshold = 0.13
-        return normalized_distance < threshold
+        return normalized_distance < self.threshold
         
     def are_fingers_rock_and_roll(self, landmarks):
         """Check if fingers are in a rock and roll position."""
+        # Check if the thumb and pinky are close together
+        thumb_tip = landmarks.landmark[self.mp_hands.HandLandmark.THUMB_TIP]
+        pinky_tip = landmarks.landmark[self.mp_hands.HandLandmark.PINKY_TIP]
+        tips_distance = ((thumb_tip.x - pinky_tip.x) ** 2 + (thumb_tip.y - pinky_tip.y) ** 2) ** 0.5
+
+        wrist = landmarks.landmark[self.mp_hands.HandLandmark.WRIST]
+        index_tip = landmarks.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
+        hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
+
+        normalized_distance = tips_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
+        return normalized_distance < self.threshold
         
 
     def distance_between_fingers(self, landmarks, finger1_tip_id, finger2_tip_id):
@@ -295,15 +310,12 @@ class HandFaceTracker:
                             self.mp_hands.HandLandmark.PINKY_TIP,
                             self.mp_hands.HandLandmark.THUMB_TIP
                         )
-                        
-                        zoom_in_threshold = 0.2  
-                        zoom_out_threshold = 0.2 
-                        
-                        if normalized_distance < zoom_in_threshold:  # Thumb and pinky are close
+                                                
+                        if normalized_distance < self.zoom_in_threshold:  # Thumb and pinky are close
                             cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom in triggered by thumb and pinky close")
 
-                        elif normalized_distance > zoom_out_threshold and normalized_distance < 0.5:  # Thumb and pinky are far
+                        elif normalized_distance > self.zoom_out_threshold and normalized_distance < 0.5:  # Thumb and pinky are far
                             cv2.putText(image, "ZOOM OUT", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
                             print("Zoom out triggered by thumb and pinky far")
 
