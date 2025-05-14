@@ -112,10 +112,32 @@ class HandFaceTracker:
         normalized_distance = tips_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
         threshold = 0.13
         return normalized_distance < threshold
-    
+        
     def are_fingers_rock_and_roll(self, landmarks):
         """Check if fingers are in a rock and roll position."""
         
+
+    def distance_between_fingers(self, landmarks, finger1_tip_id, finger2_tip_id):
+        # Generalized function to calculate normalized distance between two fingers
+        finger1_tip = landmarks.landmark[finger1_tip_id]
+        finger2_tip = landmarks.landmark[finger2_tip_id]
+
+        # Calculate the Euclidean distance between the two finger tips
+        finger_distance = self.calculate_distance(
+            (finger1_tip.x, finger1_tip.y),
+            (finger2_tip.x, finger2_tip.y)
+        )
+
+        # Use wrist to index fingertip distance as a normalizing factor
+        wrist = landmarks.landmark[self.mp_hands.HandLandmark.WRIST]
+        index_tip = landmarks.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
+        hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
+
+        # Normalize the distance
+        normalized_distance = finger_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
+
+        return normalized_distance
+                        
 
     def draw_square_with_zones(self, image, x, y, square_size, name):
         """Draw a square with diagonal zones."""
@@ -268,27 +290,14 @@ class HandFaceTracker:
                     if fingers_together:
                         status_text_main = "Control: ENABLED"
 
-                        # Calculate the distance between pinky and thumb on the left hand
-                        pinky_tip = left_hand.landmark[self.mp_hands.HandLandmark.PINKY_TIP]
-                        thumb_tip = left_hand.landmark[self.mp_hands.HandLandmark.THUMB_TIP]
-
-                        # Calculate the distance between pinky and thumb tips
-                        thumb_pinky_distance = self.calculate_distance(
-                            (thumb_tip.x, thumb_tip.y),
-                            (pinky_tip.x, pinky_tip.y)
+                        normalized_distance = self.distance_between_fingers(
+                            left_hand,
+                            self.mp_hands.HandLandmark.PINKY_TIP,
+                            self.mp_hands.HandLandmark.THUMB_TIP
                         )
                         
-                        # Use wrist to index fingertip distance as a normalizing factor
-                        wrist = left_hand.landmark[self.mp_hands.HandLandmark.WRIST]
-                        index_tip = left_hand.landmark[self.mp_hands.HandLandmark.INDEX_FINGER_TIP]
-                        hand_size_reference = ((wrist.x - index_tip.x) ** 2 + (wrist.y - index_tip.y) ** 2) ** 0.5
-                        
-                        # Normalize the distance
-                        normalized_distance = thumb_pinky_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
-                        
-                        # Define thresholds for zooming
-                        zoom_in_threshold = 0.2  # Adjust based on testing
-                        zoom_out_threshold = 0.2  # Adjust based on testing
+                        zoom_in_threshold = 0.2  
+                        zoom_out_threshold = 0.2 
                         
                         if normalized_distance < zoom_in_threshold:  # Thumb and pinky are close
                             cv2.putText(image, "ZOOM IN", (10, 70), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
