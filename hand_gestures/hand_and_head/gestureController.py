@@ -10,7 +10,7 @@ class HandFaceTracker:
 
     def __init__(self):
         """
-        Initialize MediaPipe hands and face mesh, webcam, and control variables.
+        Initialize MediaPipe hands and face mesh, webcams, and control variables.
         """
         # Initialize MediaPipe hands and face mesh
         self.mp_hands = mp.solutions.hands
@@ -32,10 +32,15 @@ class HandFaceTracker:
             min_tracking_confidence=0.5
         )
 
-        # Initialize webcam
+        # Initialize webcams
         self.cap = cv2.VideoCapture(0)
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 2000)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 2000)
+        
+        # Initialize second webcam
+        self.cap2 = cv2.VideoCapture(1)  # Using camera index 1 for the second camera
+        self.cap2.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        self.cap2.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
         # Variables to track control enable/disable
         self.control_enabled = True
@@ -49,6 +54,14 @@ class HandFaceTracker:
 
         # Register the key press event to toggle display
         keyboard.on_press_key('d', self.toggle_display)
+
+    def capture_second_camera(self):
+        """Capture image from second camera."""
+        success, second_image = self.cap2.read()
+        if not success:
+            print("Failed to capture image from second webcam.")
+            return None
+        return second_image
 
     def toggle_control(self, event):
         """Toggle the control state between enabled and disabled."""
@@ -99,6 +112,10 @@ class HandFaceTracker:
         normalized_distance = tips_distance / hand_size_reference if hand_size_reference > 0 else float('inf')
         threshold = 0.13
         return normalized_distance < threshold
+    
+    def are_fingers_rock_and_roll(self, landmarks):
+        """Check if fingers are in a rock and roll position."""
+        
 
     def draw_square_with_zones(self, image, x, y, square_size, name):
         """Draw a square with diagonal zones."""
@@ -358,16 +375,17 @@ class HandFaceTracker:
         x, y = squares[1]['x'], squares[1]['y']
         image = self.draw_square_with_zones(image, x, y, square_size_left, squares[1]['name'])
         return image
-    
+        
     def run(self):
         """Run the main loop to process video frames and perform gesture-based control."""
         print("Script is running. Press 'n' to toggle control, 'd' to toggle camera display, ESC to exit.")
 
-        while self.cap.isOpened():
+        while self.cap.isOpened() and self.cap2.isOpened():
             
             image, hand_centers, hand_types, hand_landmarks_dict, face_center, head_size = self.image_setup()
+            second_image = self.capture_second_camera()
 
-            if image is None:
+            if image is None or second_image is None:
                 print("No image captured. Exiting...")
                 break
 
@@ -383,12 +401,15 @@ class HandFaceTracker:
 
             if self.display_camera:
                 cv2.imshow('Square Zone Detection', image)
+                # Display the second camera feed in a separate window
+                cv2.imshow('Second Camera', second_image)
 
             key = cv2.waitKey(1) & 0xFF
             if key == 27:  # ESC to exit
                 break
 
         self.cap.release()
+        self.cap2.release()
         cv2.destroyAllWindows()
         print("Script terminated.")
 

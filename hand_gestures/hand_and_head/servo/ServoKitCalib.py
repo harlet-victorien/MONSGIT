@@ -78,7 +78,7 @@ class ServoKit(object):
         else:
             print("Choix invalide")
 
-        self.NumCamera = int(input("Renseignez le numéro (0,2, 4, 6 ...) assigné à la camera (Pour trouver le numéro, insérez dans un terminal : 'v4l2-ctl --list-devices') : "))
+        # self.NumCamera = int(input("Renseignez le numéro (0,2, 4, 6 ...) assigné à la camera (Pour trouver le numéro, insérez dans un terminal : 'v4l2-ctl --list-devices') : "))
 
         self.resetAll()
         print("Initializing complete.")
