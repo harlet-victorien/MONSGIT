@@ -31,13 +31,12 @@ import Jetson.GPIO as GPIO
 
 from pynput import keyboard
 import sys
-from ultralytics import YOLO
+#from ultralytics import YOLO
 import numpy as np
-from jtop import jtop
+#from jtop import jtop
 import cv2
-import torch
+#import torch
 import math
-from jtop import jtop
 import time
 np.bool = np.bool_
 default_angleBottom1 = 70

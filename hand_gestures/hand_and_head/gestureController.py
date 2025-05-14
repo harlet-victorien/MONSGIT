@@ -326,7 +326,7 @@ class HandFaceTracker:
             print("Failed to capture image from webcam.")
             return None
 
-        image = cv2.flip(image, 1)
+        image = cv2.flip(image, 0)
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         hand_results = self.hands.process(rgb_image)

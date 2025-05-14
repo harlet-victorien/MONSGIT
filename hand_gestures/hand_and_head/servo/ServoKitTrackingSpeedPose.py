@@ -1,10 +1,9 @@
-import sys
-from ultralytics import YOLO
+#from ultralytics import YOLO
 import numpy as np
-from jtop import jtop
+#from jtop import jtop
 import cv2
 import time
-import ServoKitCalib
+from servo.ServoKitCalib import ServoKit
 
 np.bool = np.bool_  # Compatibilité avec les anciennes versions de numpy
 
@@ -32,7 +31,7 @@ class PoseTracker:
         self.width = width
         self.height = height
 
-        self.servo_kit = ServoKitCalib.ServoKit(num_ports = 4)
+        self.servo_kit = ServoKit(num_ports = 4)
         self.cam_source = self.servo_kit.NumCamera
         self.servo_kit.setAngleDeg(0, 0)
         self.servo_kit.setAngleDeg(1, 0)
